@@ -63,7 +63,7 @@ jobs:
               echo "KEY_PASSWORD=${KS_KEYPASS:-$KS_PASS}"
             } >> "$GITHUB_ENV"
           else
-            echo "No keystore secret found. Generating a temporary one for testing..."
+            echo "No keystore secret found. Generating a temporary one..."
             keytool -genkeypair -keystore app/release.keystore -storepass subgenius-ci -keypass subgenius-ci \
               -alias subgenius -keyalg RSA -keysize 2048 -validity 10000 \
               -dname "CN=SubGenius, O=SubGenius, C=US"
@@ -72,7 +72,6 @@ jobs:
               echo "KEY_ALIAS=subgenius"
               echo "KEY_PASSWORD=subgenius-ci"
             } >> "$GITHUB_ENV"
-            echo "::warning::Temporary signing key used (not valid for Google Play)"
           fi
           echo "KEYSTORE_FILE=release.keystore" >> "$GITHUB_ENV"
 
@@ -87,7 +86,6 @@ jobs:
           cp app/build/outputs/apk/debug/*.apk dist/SubGenius-debug.apk
           cp app/build/outputs/apk/release/*.apk dist/SubGenius-release.apk || true
           cp app/build/outputs/bundle/release/*.aab dist/SubGenius-release.aab || true
-          ls -lh dist
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
