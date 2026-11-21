@@ -36,53 +36,26 @@ jobs:
           echo "PROJECT_DIR=$D" >> "$GITHUB_ENV"
           echo "Project found in: $D"
 
-      - name: Ensure single libc++_shared.so via pickFirst
+      - name: Fix duplicate libc++_shared.so
         working-directory: ${{ env.PROJECT_DIR }}
         run: |
           GRADLE_FILE="app/build.gradle.kts"
           if ! grep -q "libc++_shared.so" "$GRADLE_FILE"; then
-            python3 - <<'PY'
-from pathlib import Path
-
-p = Path("app/build.gradle.kts")
-text = p.read_text(encoding="utf-8")
-
-snippet = """
-    packaging {
-        jniLibs {
-            pickFirsts.add("lib/arm64-v8a/libc++_shared.so")
-            pickFirsts.add("lib/armeabi-v7a/libc++_shared.so")
-            pickFirsts.add("lib/x86/libc++_shared.so")
-            pickFirsts.add("lib/x86_64/libc++_shared.so")
-        }
-    }
-"""
-
-idx = text.find("android {")
-if idx != -1:
-    brace_count = 0
-    started = False
-    insert_pos = None
-    for i in range(idx, len(text)):
-        if text[i] == "{":
-            brace_count += 1
-            started = True
-        elif text[i] == "}":
-            brace_count -= 1
-            if started and brace_count == 0:
-                insert_pos = i
-                break
-    if insert_pos is not None:
-        new_text = text[:insert_pos] + snippet + text[insert_pos:]
-        p.write_text(new_text, encoding="utf-8")
-        print("Added pickFirsts for libc++_shared.so inside android { }")
-    else:
-        raise RuntimeError("Could not find matching closing brace for android { }")
-else:
-    raise RuntimeError("android { block not found in app/build.gradle.kts")
-PY
-          else
-            echo "libc++_shared.so rule already present in $GRADLE_FILE"
+            awk '
+              /^android[[:space:]]*\{/ { found=1 }
+              found && /^\}/ && !done {
+                print "    packaging {"
+                print "        jniLibs {"
+                print "            pickFirsts.add(\"lib/arm64-v8a/libc++_shared.so\")"
+                print "            pickFirsts.add(\"lib/armeabi-v7a/libc++_shared.so\")"
+                print "            pickFirsts.add(\"lib/x86/libc++_shared.so\")"
+                print "            pickFirsts.add(\"lib/x86_64/libc++_shared.so\")"
+                print "        }"
+                print "    }"
+                done=1
+              }
+              { print }
+            ' "$GRADLE_FILE" > "${GRADLE_FILE}.tmp" && mv "${GRADLE_FILE}.tmp" "$GRADLE_FILE"
           fi
 
       - name: Set up JDK 17
